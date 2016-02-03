@@ -9,7 +9,6 @@ _site/
 
 *.orig
 
-Gemfile.lock
 
 
 #seek application folders that may hang around
