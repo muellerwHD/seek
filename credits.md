@@ -11,6 +11,8 @@ layout: page
 BioVel - http://www.biovel.eu/ (Portal based on SEEK -
 https://portal.biovel.eu/)
 
+BiVeS - https://sems.uni-rostock.de/projects/bives/
+
 SynBioChem - http://synbiochem.co.uk/
 
 Virtual Liver Network - http://www.virtual-liver.de/
