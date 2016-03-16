@@ -12,6 +12,20 @@ class SampleTypeTest < ActiveSupport::TestCase
     refute sample_type.valid?
     sample_type.title=""
     refute sample_type.valid?
+
+    #cannot have 2 attributes with the same name
+    sample_type = SampleType.new :title=>"fish"
+    sample_type.sample_attributes << Factory(:simple_string_sample_attribute, :title=>"a",is_title:true, :sample_type => sample_type)
+    assert sample_type.valid?
+    sample_type.sample_attributes << Factory(:simple_string_sample_attribute, :title=>"a",is_title:false, :sample_type => sample_type)
+    refute sample_type.valid?
+
+    #uniqueness check should be case insensitive
+    sample_type = SampleType.new :title=>"fish"
+    sample_type.sample_attributes << Factory(:simple_string_sample_attribute, :title=>"aaa",is_title:true, :sample_type => sample_type)
+    assert sample_type.valid?
+    sample_type.sample_attributes << Factory(:simple_string_sample_attribute, :title=>"aAA",is_title:false, :sample_type => sample_type)
+    refute sample_type.valid?
   end
 
   test "test uuid generated" do
@@ -123,5 +137,158 @@ class SampleTypeTest < ActiveSupport::TestCase
     refute type.valid?
   end
 
+  test 'build from template' do
+    string_type = Factory(:string_sample_attribute_type, title:'String')
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    refute_nil sample_type.template
+
+    sample_type.build_attributes_from_template
+    attribute_names = sample_type.sample_attributes.collect(&:title)
+    assert_equal ['full name','date of birth', 'hair colour', 'eye colour'], attribute_names
+    columns = sample_type.sample_attributes.collect(&:template_column_index)
+    assert_equal [1,2,3,4],columns
+
+    assert sample_type.sample_attributes.first.is_title?
+    sample_type.sample_attributes.each do |attr|
+      assert_equal string_type,attr.sample_attribute_type
+    end
+
+    assert sample_type.valid?
+    sample_type.save!
+    sample_type = SampleType.find(sample_type.id)
+    attribute_names = sample_type.sample_attributes.collect(&:title)
+    assert_equal ['full name','date of birth', 'hair colour', 'eye colour'], attribute_names
+    columns = sample_type.sample_attributes.collect(&:template_column_index)
+    assert_equal [1,2,3,4],columns
+
+  end
+
+  #a less clean template, to check it takes the last sample sheet, and handles irregular columns
+  test 'build from template2' do
+    string_type = Factory(:string_sample_attribute_type, title:'String')
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob2)
+    refute_nil sample_type.template
+
+    sample_type.build_attributes_from_template
+    attribute_names = sample_type.sample_attributes.collect(&:title)
+    assert_equal ['full name','date of birth', 'hair colour', 'eye colour'], attribute_names
+    columns = sample_type.sample_attributes.collect(&:template_column_index)
+    assert_equal [3,7,10,11],columns
+
+    assert sample_type.sample_attributes.first.is_title?
+    sample_type.sample_attributes.each do |attr|
+      assert_equal string_type,attr.sample_attribute_type
+    end
+
+    assert sample_type.valid?
+    sample_type.save!
+    sample_type = SampleType.find(sample_type.id)
+    attribute_names = sample_type.sample_attributes.collect(&:title)
+    assert_equal ['full name','date of birth', 'hair colour', 'eye colour'], attribute_names
+    columns = sample_type.sample_attributes.collect(&:template_column_index)
+    assert_equal [3,7,10,11],columns
+  end
+
+  test 'compatible template file' do
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    assert sample_type.compatible_template_file?
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob2)
+    assert sample_type.compatible_template_file?
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    assert sample_type.compatible_template_file?
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:binary_content_blob)
+    refute sample_type.compatible_template_file?
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:rightfield_content_blob)
+    refute sample_type.compatible_template_file?
+
+    sample_type = SampleType.new title:'from template'
+    refute sample_type.compatible_template_file?
+  end
+
+  test 'matches content blob?' do
+    template_blob = Factory(:sample_type_populated_template_content_blob)
+    non_template1 = Factory(:rightfield_content_blob)
+    non_template2 = Factory(:binary_content_blob)
+
+    Factory(:string_sample_attribute_type, title:'String')
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    sample_type.build_attributes_from_template
+    sample_type.save!
+
+    assert sample_type.matches_content_blob?(template_blob)
+    refute sample_type.matches_content_blob?(non_template1)
+    refute sample_type.matches_content_blob?(non_template2)
+  end
+
+  test 'sample_types_matching_content_blob' do
+    Factory(:string_sample_attribute_type, title:'String')
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    sample_type.build_attributes_from_template
+    sample_type.save!
+
+    Factory(:string_sample_attribute_type, title:'String')
+    sample_type2 = SampleType.new title:'from template'
+    sample_type2.content_blob = Factory(:sample_type_template_content_blob2)
+    sample_type2.build_attributes_from_template
+    sample_type2.save!
+
+    template_blob = Factory(:sample_type_populated_template_content_blob)
+    non_template1 = Factory(:rightfield_content_blob)
+
+    assert_empty SampleType.sample_types_matching_content_blob(non_template1)
+    assert_equal [sample_type],SampleType.sample_types_matching_content_blob(template_blob)
+  end
+
+  test 'build samples from template' do
+    Factory(:string_sample_attribute_type, title:'String')
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    sample_type.build_attributes_from_template
+    sample_type.save!
+
+    template_blob = Factory(:sample_type_populated_template_content_blob)
+    samples = sample_type.build_samples_from_template(template_blob)
+    assert_equal 4,samples.count
+
+    sample = samples.first
+    assert sample.valid?
+    assert_equal "Bob Monkhouse",sample.full_name
+    assert_equal "Blue", sample.hair_colour
+    assert_equal "Yellow", sample.eye_colour
+    assert_equal Date.parse("12 March 1970"), Date.parse(sample.date_of_birth)
+  end
+
+  test 'dependant destroy content blob' do
+    string_type = Factory(:string_sample_attribute_type, title:'String')
+
+    sample_type = SampleType.new title:'from template'
+    sample_type.content_blob = Factory(:sample_type_template_content_blob)
+    sample_type.build_attributes_from_template
+    sample_type.save!
+    blob = sample_type.content_blob
+
+    assert_difference('ContentBlob.count',-1) do
+      assert_difference('SampleType.count',-1) do
+        sample_type.destroy
+      end
+    end
+
+    assert blob.destroyed?
+  end
 
 end
