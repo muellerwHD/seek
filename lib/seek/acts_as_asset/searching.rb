@@ -19,7 +19,12 @@ module Seek
           text :content_blob do
             content_blob_search_terms
           end
-          text :assay_type_titles, :technology_type_titles
+          if self.respond_to?(:assay_type_titles)
+            text :assay_type_titles
+          end
+          if self.respond_to?(:technology_type_titles)
+            text :technology_type_titles
+          end
         end if Seek::Config.solr_enabled
       end
     end

@@ -1,6 +1,6 @@
 <%= render :partial => "general/item_title", :locals => {:item => @sample_type} %>
 
-<% if @sample_type.template %>
+<% if @sample_type.contains_downloadable_items? %>
 
     <h2>Template</h2>
 
