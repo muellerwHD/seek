@@ -85,6 +85,15 @@ class SampleType < ActiveRecord::Base
     true
   end
 
+  #FIXME: these are just here to satisfy the Searchable module, as a quick fix
+  def assay_type_titles
+    []
+  end
+
+  def tech_type_titles
+    []
+  end
+
   private
 
   #required by Seek::ActsAsAsset::Searching - don't really need to full search terms, including content provided by Seek::ActsAsAsset::ContentBlobs
@@ -143,7 +152,7 @@ class SampleType < ActiveRecord::Base
   end
 
   def attribute_search_terms
-    sample_attributes.collect(&:title)  
+    sample_attributes.collect(&:title)
   end
 
   class UnknownAttributeException < Exception; end
